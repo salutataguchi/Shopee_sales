@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopee班 売上管理</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:sans-serif;background:#f5f5f0;color:#1a1a1a;padding:16px;}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+h1{font-size:18px;font-weight:500;}
+select,input[type=number],input[type=text]{font-size:13px;padding:5px 8px;border:1px solid #ccc;border-radius:6px;background:#fff;}
+.tabs{display:flex;border-bottom:1px solid #ddd;margin-bottom:16px;}
+.tbtn{font-size:13px;padding:8px 18px;border:none;background:none;cursor:pointer;color:#666;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tbtn.on{color:#111;border-bottom-color:#111;font-weight:500;}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;}
+.mc{background:#fff;border-radius:8px;padding:14px;border:1px solid #e8e8e8;}
+.ml{font-size:11px;color:#888;margin-bottom:6px;}
+.mv{font-size:20px;font-weight:500;}
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
+.card{background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:14px;}
+.ct{font-size:13px;font-weight:500;color:#666;margin-bottom:12px;}
+table.t{width:100%;border-collapse:collapse;font-size:12px;}
+table.t th{text-align:left;font-weight:500;color:#666;padding:6px;border-bottom:1px solid #eee;white-space:nowrap;font-size:11px;background:#fafafa;}
+table.t td{padding:5px 6px;border-bottom:1px solid #f0f0f0;white-space:nowrap;}
+table.t tr:hover td{background:#fafafa;}
+table.t input[type=number]{width:66px;font-size:11px;padding:3px 4px;border:1px solid #ccc;border-radius:4px;}
+.hm{background:#e8f4fd !important;color:#1565c0 !important;font-size:10px !important;}
+.badge{display:inline-block;font-size:11px;padding:2px 7px;border-radius:4px;}
+.bok{background:#e8f5e9;color:#2e7d32;}
+.bwn{background:#fff8e1;color:#e65100;}
+.bng{background:#ffebee;color:#c62828;}
+.bcl{background:#f5f5f5;color:#999;}
+tr.cancelled td{background:#fff5f5 !important;}
+tr.cancelled td input{background:#fff5f5;}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px;background:#fff;border-radius:8px;border:1px solid #e8e8e8;margin-bottom:10px;}
+.tbr-btn{font-size:13px;padding:6px 12px;border:1px solid #bbb;border-radius:6px;background:#fff;cursor:pointer;}
+.tbr-btn:hover{background:#f5f5f5;}
+.tbr-btn.green{border-color:#2e7d32;color:#2e7d32;}
+.tbr-btn.blue{border-color:#1565c0;color:#1565c0;}
+.tbr-btn.red{border-color:#c62828;color:#c62828;}
+.search-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.search-row input[type=text]{flex:1;max-width:320px;}
+.hint{font-size:11px;color:#999;margin-top:8px;}
+tr.grp-head td{background:#f7f7f5;cursor:pointer;}
+tr.grp-head:hover td{background:#efefeb !important;}
+tr.grp-child td{background:#fdfdfc;}
+tr.grp-child.hidden{display:none;}
+@media(max-width:600px){.charts{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📊 Shopee班 売上管理</h1>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <select id="sm" onchange="filt()"><option value="all">全期間</option></select>
+    <select id="sc" onchange="onMarketChange()"><option value="all">全市場</option><option value="TH">タイ</option><option value="PH">フィリピン</option><option value="MY">マレーシア</option><option value="SG">シンガポール</option><option value="TW">台湾</option><option value="VN">ベトナム</option></select>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tbtn on" id="bd" onclick="tab('d')">📈 ダッシュボード</button>
+  <button class="tbtn" id="bo" onclick="tab('o')">📋 注文データ</button>
+  <button class="tbtn" id="bcu" onclick="tab('c')">👥 顧客情報</button>
+  <button class="tbtn" id="bm" onclick="tab('m')">📦 商品マスタ</button>
+  <button class="tbtn" id="bs" onclick="tab('s')">⚙️ 市場設定</button>
+</div>
+
+<!-- Dashboard -->
+<div id="td">
+  <div class="metrics">
+    <div class="mc"><div class="ml">売上合計(THB)</div><div class="mv" id="ms">-</div></div>
+    <div class="mc"><div class="ml">注文数</div><div class="mv" id="mo">-</div></div>
+    <div class="mc"><div class="ml">利益合計(¥)</div><div class="mv" id="mp">-</div></div>
+    <div class="mc"><div class="ml">平均利益率</div><div class="mv" id="mr">-</div></div>
+  </div>
+  <div class="charts">
+    <div class="card"><div class="ct">日別入金額推移(THB)</div><div style="position:relative;height:180px;"><canvas id="cd"></canvas></div></div>
+    <div class="card"><div class="ct">国別売上(THB)</div><div style="position:relative;height:180px;"><canvas id="cc"></canvas></div></div>
+  </div>
+  <div class="card"><div class="ct">商品別ランキング</div><div style="overflow-x:auto;"><table class="t" id="rt"></table></div></div>
+</div>
+
+<!-- Orders -->
+<div id="to" style="display:none;">
+  <div class="toolbar">
+    <input type="file" id="ef" accept=".xlsx,.xls" style="display:none;" onchange="uploadXlsx(this)">
+    <input type="file" id="jf" accept=".json" style="display:none;" onchange="importJSON(this)">
+    <button class="tbr-btn" onclick="document.getElementById('ef').click()">📥 Excelを取り込む</button>
+    <button class="tbr-btn blue" onclick="document.getElementById('jf').click()">📂 JSONを読み込む</button>
+    <button class="tbr-btn green" onclick="exportJSON()">💾 JSONを保存</button>
+    <button class="tbr-btn" onclick="clearData()">🗑 クリア</button>
+    <button class="tbr-btn blue" onclick="applyMaster()" style="margin-left:4px;">🔄 マスタを適用</button>
+    <button class="tbr-btn green" onclick="exportExcel()" style="margin-left:4px;">📊 帳票Excel出力</button>
+    <span id="us" style="font-size:13px;color:#888;"></span>
+    <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+      <label id="rate-label" style="font-size:12px;color:#666;">1฿ =</label>
+      <input type="number" id="ri" value="4.90" step="0.01" min="0.001" style="width:68px;" oninput="onRateInput()">
+      <span style="font-size:12px;color:#666;">¥</span>
+    </div>
+  </div>
+  <div class="search-row">
+    <span style="font-size:14px;">🔍</span>
+    <input type="text" id="ord-search" placeholder="商品名・SKU・アカウントで検索..." oninput="ordSearch()">
+    <label style="font-size:12px;color:#666;display:flex;align-items:center;gap:4px;cursor:pointer;">
+      <input type="checkbox" id="show-cancelled" onchange="otbl()" style="width:auto;">キャンセルも表示
+    </label>
+    <span id="ord-count" style="font-size:12px;color:#888;"></span>
+  </div>
+  <div style="overflow-x:auto;border:1px solid #e8e8e8;border-radius:8px;">
+    <table class="t" id="ot" style="min-width:1020px;"></table>
+  </div>
+  <p class="hint">💡 青ヘッダー＝手入力欄　利益(¥)＝実入金額(฿)×レート − 仕入原価(¥) − 発送代行(¥) − 国内送料(¥) − 雑費(¥)　※実入金額＝Estimated Order Income（手数料・バウチャー・関税控除済み）　データは自動保存されます</p>
+</div>
+
+<!-- Customers -->
+<div id="tc" style="display:none;">
+  <div class="search-row">
+    <span style="font-size:14px;">🔍</span>
+    <input type="text" id="cust-search" placeholder="アカウント名・住所で検索..." oninput="custTbl()">
+    <span id="cust-count" style="font-size:12px;color:#888;"></span>
+  </div>
+  <div style="overflow-x:auto;border:1px solid #e8e8e8;border-radius:8px;">
+    <table class="t" id="ctbl"></table>
+  </div>
+</div>
+
+<!-- 商品マスタ -->
+<div id="tm" style="display:none;">
+  <div class="toolbar">
+    <input type="text" id="m-psku" placeholder="親SKU" style="width:130px;">
+    <input type="text" id="m-sku" placeholder="SKU" style="width:130px;">
+    <input type="text" id="m-name" placeholder="日本語タイトル" style="width:260px;">
+    <button class="tbr-btn green" onclick="masterAdd()">＋ 追加</button>
+    <button class="tbr-btn blue" onclick="masterFromOrders()">📋 注文データから一括追加</button>
+    <button class="tbr-btn" onclick="masterExportCSV()">💾 CSVで保存</button>
+    <input type="file" id="mf" accept=".csv" style="display:none;" onchange="masterImportCSV(this)">
+    <button class="tbr-btn" onclick="document.getElementById('mf').click()">📂 CSVを読み込む</button>
+  </div>
+  <div class="search-row">
+    <span style="font-size:14px;">🔍</span>
+    <input type="text" id="master-search" placeholder="SKU・日本語タイトルで検索..." oninput="masterTbl()">
+    <span id="master-count" style="font-size:12px;color:#888;"></span>
+  </div>
+  <div style="overflow-x:auto;border:1px solid #e8e8e8;border-radius:8px;">
+    <table class="t" id="mtbl"></table>
+  </div>
+  <p class="hint">💡 登録したSKUはExcel取り込み・「マスタを適用」時に商品名へ自動反映されます</p>
+</div>
+
+<!-- 市場設定 -->
+<div id="ts" style="display:none;">
+  <div class="card">
+    <div class="ct">市場別設定</div>
+    <div style="overflow-x:auto;">
+      <table class="t" id="stbl"></table>
+    </div>
+    <p class="hint" style="margin-top:12px;">💡 設定はlocalStorageに保存されます。市場を切り替えると為替レート・デフォルト手数料が自動で反映されます。</p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const LS_KEY='shopee_sales_v1';
+const LS_MASTER='shopee_master_v1';
+const LS_MKT='shopee_mkt_v1';
+let master={};
+
+// 市場設定
+const DEFAULT_MKT={
+  TH:{name:'タイ',      symbol:'฿',  rate:4.90,  sf:3.21, pf:16.85},
+  PH:{name:'フィリピン', symbol:'₱',  rate:2.6,   sf:3.0,  pf:2.0},
+  MY:{name:'マレーシア', symbol:'RM', rate:32.0,  sf:3.0,  pf:2.0},
+  SG:{name:'シンガポール',symbol:'S$', rate:110.0, sf:3.0,  pf:2.0},
+  TW:{name:'台湾',      symbol:'NT$',rate:4.6,   sf:3.0,  pf:2.0},
+  VN:{name:'ベトナム',   symbol:'₫',  rate:0.006, sf:3.0,  pf:2.0},
+};
+let mktCfg=JSON.parse(JSON.stringify(DEFAULT_MKT));
+
+function saveMkt(){try{localStorage.setItem(LS_MKT,JSON.stringify(mktCfg));}catch(e){}}
+function loadMkt(){
+  try{const d=localStorage.getItem(LS_MKT);if(d){const p=JSON.parse(d);Object.keys(DEFAULT_MKT).forEach(k=>{mktCfg[k]={...DEFAULT_MKT[k],...(p[k]||{})};});return true;}}catch(e){}
+  return false;
+}
+function getMkt(country){return mktCfg[country]||{symbol:'฿',rate:parseFloat(document.getElementById('ri')?.value)||4.4,sf:3.21,pf:16.85};}
+
+// 市場切り替え
+function onMarketChange(){
+  const c=document.getElementById('sc').value;
+  if(c!=='all'&&mktCfg[c]){
+    document.getElementById('ri').value=mktCfg[c].rate;
+    document.getElementById('rate-label').textContent='1'+mktCfg[c].symbol+' =';
+  } else {
+    document.getElementById('rate-label').textContent='1通貨 =';
+  }
+  filt();
+}
+
+// レート入力時に現在の市場設定を更新
+function onRateInput(){
+  const c=document.getElementById('sc').value;
+  const v=parseFloat(document.getElementById('ri').value)||0;
+  if(c!=='all'&&mktCfg[c]){mktCfg[c].rate=v;saveMkt();}
+  rc();
+}
+
+// 市場設定テーブル
+function settingsTbl(){
+  const rows=Object.entries(mktCfg).map(([code,m])=>`<tr>
+    <td style="font-weight:500;">${m.name}</td>
+    <td style="color:#999;">${code}</td>
+    <td><input type="text" value="${m.symbol}" style="width:50px;" oninput="mktEdit('${code}','symbol',this.value)"></td>
+    <td><input type="number" value="${m.rate}" step="0.001" min="0.001" style="width:80px;" oninput="mktEdit('${code}','rate',parseFloat(this.value)||0)"></td>
+    <td><input type="number" value="${m.sf}" step="0.01" min="0" style="width:70px;" oninput="mktEdit('${code}','sf',parseFloat(this.value)||0)"></td>
+    <td><input type="number" value="${m.pf}" step="0.01" min="0" style="width:70px;" oninput="mktEdit('${code}','pf',parseFloat(this.value)||0)"></td>
+    <td><button onclick="mktReset('${code}')" style="font-size:11px;padding:2px 8px;border:1px solid #e0e0e0;border-radius:4px;cursor:pointer;">リセット</button></td>
+  </tr>`).join('');
+  document.getElementById('stbl').innerHTML=`
+    <thead><tr>
+      <th>市場</th><th>コード</th><th>通貨記号</th>
+      <th>為替レート(1通貨=¥)</th>
+      <th>販売手数料% (デフォルト)</th>
+      <th>決済手数料% (デフォルト)</th>
+      <th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>`;
+}
+function mktEdit(code,field,val){
+  if(mktCfg[code])mktCfg[code][field]=val;
+  clearTimeout(mktEdit._t);mktEdit._t=setTimeout(saveMkt,600);
+}
+function mktReset(code){
+  if(DEFAULT_MKT[code])mktCfg[code]={...DEFAULT_MKT[code]};
+  saveMkt();settingsTbl();
+  const c=document.getElementById('sc').value;
+  if(c===code)onMarketChange();
+}
+
+function saveMaster(){try{localStorage.setItem(LS_MASTER,JSON.stringify(master));}catch(e){}}
+function loadMaster(){try{const d=localStorage.getItem(LS_MASTER);if(d){master=JSON.parse(d);return true;}}catch(e){}return false;}
+
+function applyMasterToOrds(){
+  ords.forEach(o=>{
+    const m=master[o.sku]||master[o.parentSku];
+    if(m&&m.name)o.product=m.name;
+  });
+}
+function applyMaster(){
+  applyMasterToOrds();saveLS();otbl();
+  setStatus('マスタを適用しました ✅');
+}
+
+function masterAdd(){
+  const psku=document.getElementById('m-psku').value.trim();
+  const sku=document.getElementById('m-sku').value.trim();
+  const name=document.getElementById('m-name').value.trim();
+  if(!sku||!name){alert('SKUと日本語タイトルは必須です');return;}
+  master[sku]={parentSku:psku,sku,name};
+  saveMaster();masterTbl();
+  document.getElementById('m-psku').value='';
+  document.getElementById('m-sku').value='';
+  document.getElementById('m-name').value='';
+}
+
+function masterDel(sku){
+  delete master[sku];saveMaster();masterTbl();
+}
+
+function masterFromOrds(){
+  let added=0;
+  ords.forEach(o=>{
+    if(o.sku&&!master[o.sku]){
+      master[o.sku]={parentSku:o.parentSku||'',sku:o.sku,name:o.product||''};
+      added++;
+    }
+  });
+  saveMaster();masterTbl();
+  alert(added+'件を商品マスタに追加しました。日本語タイトルを編集してください。');
+}
+
+function masterExportCSV(){
+  const rows=[['親SKU','SKU','日本語タイトル'],...Object.values(master).map(m=>[m.parentSku,m.sku,m.name])];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='product_master.csv';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+
+function masterImportCSV(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const lines=e.target.result.replace(/\r/g,'').split('\n').filter(Boolean);
+      lines.slice(1).forEach(line=>{
+        const cols=line.split(',').map(v=>v.replace(/^"|"$/g,'').replace(/""/g,'"'));
+        if(cols[1]&&cols[2])master[cols[1]]={parentSku:cols[0]||'',sku:cols[1],name:cols[2]};
+      });
+      saveMaster();masterTbl();
+      alert('CSVを読み込みました');
+    }catch(err){alert('読み込みエラー: '+err.message);}
+  };
+  reader.readAsText(file,'UTF-8');input.value='';
+}
+
+function masterTbl(){
+  const st=(document.getElementById('master-search')?.value||'').toLowerCase();
+  let items=Object.values(master);
+  if(st)items=items.filter(m=>(m.sku||'').toLowerCase().includes(st)||(m.name||'').toLowerCase().includes(st)||(m.parentSku||'').toLowerCase().includes(st));
+  const cnt=document.getElementById('master-count');
+  if(cnt)cnt.textContent=st?`${items.length}/${Object.keys(master).length}件`:`${Object.keys(master).length}件`;
+  const rows=items.map((m,i)=>`<tr>
+    <td style="font-size:11px;color:#999;">${m.parentSku||'-'}</td>
+    <td style="font-size:11px;color:#999;">${m.sku}</td>
+    <td><input type="text" value="${(m.name||'').replace(/"/g,'&quot;')}" style="width:300px;font-size:12px;" oninput="masterEdit('${m.sku.replace(/'/g,"\\'")}',this.value)"></td>
+    <td><button onclick="masterDel('${m.sku.replace(/'/g,"\\'")}');" style="font-size:11px;padding:2px 8px;border:1px solid #e0e0e0;border-radius:4px;cursor:pointer;color:#c62828;">削除</button></td>
+  </tr>`).join('');
+  document.getElementById('mtbl').innerHTML=`<thead><tr><th>親SKU</th><th>SKU</th><th>日本語タイトル</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="4" style="text-align:center;color:#aaa;padding:20px;">データがありません</td></tr>'}</tbody>`;
+}
+
+function masterEdit(sku,name){
+  if(master[sku])master[sku].name=name;
+  clearTimeout(masterEdit._t);masterEdit._t=setTimeout(saveMaster,600);
+}
+const SD=[
+  {orderId:'250801N0ECDB9H',date:'2025-08-01',product:'Delfonics Rollbahn Memo L 5mm Grid',sku:'B085GDRHKN',parentSku:'PB003N1TRSY',variation:'Olive',price:493,qty:1,sf:3.21,account:'damascus0925',phone:'******65',address:'กรุงเทพมหานคร เขตดินแดง',country:'TH',receipt:398,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+  {orderId:'250803U5V2WXYV',date:'2025-08-03',product:'Tone 4way Ratchet Glasses Wrench RMW',sku:'PB004OCSEIK',parentSku:'PB004OCSEIK',variation:'',price:1102,qty:1,sf:3.21,account:'tools_bar',phone:'******01',address:'กรุงเทพมหานคร เขตคันนายาว',country:'TH',receipt:841,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+  {orderId:'250805KAKUNO01',date:'2025-08-05',product:'PILOT カクノ Madoromi Blue F',sku:'B09KAKUNO1',parentSku:'B09KAKUNO1',variation:'まどろみブルー',price:1398,qty:2,sf:3.21,account:'pen_lover_th',phone:'******22',address:'เชียงใหม่',country:'TH',receipt:2200,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+  {orderId:'250807ELITE95S1',date:'2025-08-07',product:'PILOT Elite 95S EF Black',sku:'B00DDBWZ3I',parentSku:'B00DDBWZ3I',variation:'EF/Black',price:3200,qty:1,sf:3.21,account:'collector99',phone:'******77',address:'ภูเก็ต',country:'TH',receipt:2950,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+  {orderId:'250810INK350BK1',date:'2025-08-10',product:'PILOT インク 350ml Black',sku:'B001P2XUAY',parentSku:'B001P2XUAY',variation:'Black',price:1850,qty:3,sf:3.21,account:'inkfan_bkk',phone:'******44',address:'นนทบุรี',country:'TH',receipt:5100,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+  {orderId:'250815PRERA001',date:'2025-08-15',product:'PILOT PRERA M Dark Teal',sku:'B09PRERA01',parentSku:'B09PRERA01',variation:'M/DarkTeal',price:4200,qty:1,sf:3.21,account:'thai_writer',phone:'******99',address:'กรุงเทพมหานคร',country:'TH',receipt:3800,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+  {orderId:'250820INK350BK2',date:'2025-08-20',product:'PILOT インク 350ml Black',sku:'B001P2XUAY',parentSku:'B001P2XUAY',variation:'Black',price:1850,qty:2,sf:3.21,account:'inkfan_bkk',phone:'******44',address:'นนทบุรี',country:'TH',receipt:3400,cost:0,sls:0,pf:16.85,af:0,ds:0,pk:0},
+];
+
+let ords=[];
+let cD=null,cC=null,ordST='';
+
+function rate(){
+  const c=document.getElementById('sc')?.value||'all';
+  if(c!=='all'&&mktCfg[c])return mktCfg[c].rate;
+  return parseFloat(document.getElementById('ri')?.value)||4.4;
+}
+
+function getOrdRate(o){
+  if(o.rate&&o.rate>0)return o.rate;
+  const c=document.getElementById('sc')?.value||'all';
+  if(c!=='all'&&mktCfg[c])return mktCfg[c].rate;
+  return parseFloat(document.getElementById('ri')?.value)||4.4;
+}
+
+function cp(o){
+  const r=getOrdRate(o);
+  const rj=(o.receipt||0)*r;
+  if(o.cancelled){
+    o.profit=-((o.cost||0)+(o.af||0)+(o.ds||0)+(o.pk||0));
+    o.pr=-100;
+  } else {
+    o.profit=rj-(o.cost||0)-(o.af||0)-(o.ds||0)-(o.pk||0);
+    o.pr=rj>0?o.profit/rj*100:o.profit<0?-100:0;
+  }
+}
+
+function badgeClass(r){return r>=5?'badge bok':r>=0?'badge bwn':'badge bng';}
+function badgeLabel(r){return r>=5?'良好':r>=0?'要確認':'赤字';}
+
+function gf(){
+  const m=document.getElementById('sm').value,c=document.getElementById('sc').value;
+  return ords.filter(o=>!o.cancelled&&(m==='all'||o.date.startsWith(m))&&(c==='all'||o.country===c));
+}
+
+// LocalStorage
+function saveLS(){try{localStorage.setItem(LS_KEY,JSON.stringify(ords));}catch(e){}}
+function loadLS(){
+  try{const d=localStorage.getItem(LS_KEY);if(d){ords=JSON.parse(d);return true;}}catch(e){}
+  return false;
+}
+
+// JSON
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(ords,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='shopee_orders_'+new Date().toISOString().substring(0,10)+'.json';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+}
+function importJSON(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      ords=JSON.parse(e.target.result);ords.forEach(cp);saveLS();
+      setStatus(ords.length+'件を読み込みました ✅');updateMonthSelect();otbl();dash();
+    }catch(err){alert('読み込みエラー: '+err.message);}
+  };
+  reader.readAsText(file);input.value='';
+}
+function clearData(){
+  if(!confirm("⚠️ 全データ（注文履歴・顧客情報）がすべて消えます。サンプルデータに戻ります。本当によろしいですか？"))return;
+  localStorage.removeItem(LS_KEY);
+  ords=SD.map(o=>({...o,profit:0,pr:0}));ords.forEach(cp);
+  setStatus("サンプルデータに戻しました");updateMonthSelect();otbl();dash();
+}
+function setStatus(msg){const el=document.getElementById('us');if(el)el.textContent=msg;}
+
+// Tabs
+function tab(n){
+  ['d','o','c','m','s'].forEach(x=>{
+    document.getElementById('t'+x).style.display=x===n?'':'none';
+    const btnId='b'+(x==='c'?'cu':x);
+    document.getElementById(btnId).classList.toggle('on',x===n);
+  });
+  if(n==='d')dash();
+  if(n==='o')otbl();
+  if(n==='c')custTbl();
+  if(n==='m')masterTbl();
+  if(n==='s')settingsTbl();
+}
+function filt(){
+  dash();
+  if(document.getElementById('to').style.display!=='none')otbl();
+  if(document.getElementById('tc').style.display!=='none')custTbl();
+}
+
+function rc(){
+  ords.forEach(cp);dash();
+  ords.forEach((o,i)=>{
+    const p=document.getElementById('pr'+i),r=document.getElementById('rr'+i);
+    if(p)p.textContent=Math.round(o.profit).toLocaleString();
+    if(r){r.textContent=o.pr.toFixed(1)+'%';r.className=badgeClass(o.pr);}
+  });
+}
+
+function updText(i,f,v){
+  ords[i][f]=v;
+  clearTimeout(updText._t);updText._t=setTimeout(()=>{saveLS();dash();},800);
+}
+
+function upd(i,f,v){
+  ords[i][f]=parseFloat(v)||0;cp(ords[i]);
+  const p=document.getElementById('pr'+i),r=document.getElementById('rr'+i);
+  if(p)p.textContent=Math.round(ords[i].profit).toLocaleString();
+  if(r){r.textContent=ords[i].pr.toFixed(1)+'%';r.className=badgeClass(ords[i].pr);}
+  clearTimeout(upd._t);upd._t=setTimeout(()=>{saveLS();dash();},500);
+}
+
+// Dashboard
+function getCurSym(){
+  const c=document.getElementById('sc')?.value||'all';
+  return c!=='all'&&mktCfg[c]?mktCfg[c].symbol:'฿';
+}
+
+function dash(){
+  const f=gf(),r=rate(),sym=getCurSym();
+  const m=document.getElementById('sm').value,c=document.getElementById('sc').value;
+  const allInPeriod=ords.filter(o=>(m==='all'||o.date.startsWith(m))&&(c==='all'||o.country===c));
+  const cancelledCount=allInPeriod.filter(o=>o.cancelled).length;
+  const ts=f.reduce((s,o)=>s+(o.receipt||0),0),tp=f.reduce((s,o)=>s+o.profit,0);
+  const ar=ts>0?tp/(ts*r)*100:0;
+  // メトリックラベルの通貨記号更新
+  document.querySelector('#ms')?.closest('.mc')?.querySelector('.ml')?.textContent && 
+    (document.querySelector('#ms').closest('.mc').querySelector('.ml').textContent='売上合計('+sym+')');
+  document.getElementById('ms').textContent=sym+Math.round(ts).toLocaleString();
+  document.getElementById('mo').innerHTML=f.length+'件'+(cancelledCount>0?` <span style="font-size:13px;color:#999;">(ｷｬﾝｾﾙ ${cancelledCount}件除く)</span>`:'');
+  document.getElementById('mp').textContent='¥'+Math.round(tp).toLocaleString();
+  document.getElementById('mr').textContent=ar.toFixed(1)+'%';
+  dlyChart(f,sym);ctryChart(f);rankTbl(f);
+}
+
+function dlyChart(f,sym){
+  sym=sym||getCurSym();
+  const bd={};f.forEach(o=>{const d=(o.date||'').substring(8,10)+'日';bd[d]=(bd[d]||0)+(o.receipt||0);});
+  const lbs=Object.keys(bd).sort((a,b)=>parseInt(a)-parseInt(b));
+  if(cD){cD.destroy();cD=null;}
+  const ctx=document.getElementById('cd').getContext('2d');
+  cD=new Chart(ctx,{type:'line',data:{labels:lbs,datasets:[{label:'入金額',data:lbs.map(l=>bd[l]),borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.08)',borderWidth:2,pointRadius:3,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:11},color:'#888'},grid:{display:false}},y:{ticks:{font:{size:11},color:'#888',callback:v=>sym+v.toLocaleString()},grid:{color:'#f0f0f0'}}}}});
+}
+
+function ctryChart(f){
+  const cs=['TH','PH','MY','SG','TW','VN'],ls=['タイ','フィリピン','マレーシア','シンガポール','台湾','ベトナム'],cols=['#1D9E75','#378ADD','#BA7517','#E24B4A','#7F77DD','#EF9F27'];
+  if(cC){cC.destroy();cC=null;}
+  const ctx=document.getElementById('cc').getContext('2d');
+  cC=new Chart(ctx,{type:'bar',data:{labels:ls,datasets:[{data:cs.map(c=>f.filter(o=>o.country===c).reduce((s,o)=>s+(o.receipt||0),0)),backgroundColor:cols,borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:12},color:'#888'},grid:{display:false}},y:{ticks:{font:{size:11},color:'#888',callback:v=>'฿'+v.toLocaleString()},grid:{color:'#f0f0f0'}}}}});
+}
+
+function rankTbl(f){
+  const m={};f.forEach(o=>{const k=o.sku||o.product;if(!m[k])m[k]={product:o.product,sku:o.sku,sales:0,qty:0,profit:0};m[k].sales+=(o.receipt||0);m[k].qty+=(o.qty||0);m[k].profit+=o.profit;});
+  const r2=rate(),rows=Object.values(m).sort((a,b)=>b.sales-a.sales).map((r,i)=>{const p=r.sales>0?r.profit/(r.sales*r2)*100:0;return`<tr><td style="color:#999">${i+1}</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="${r.product}">${r.product}</td><td style="color:#999">${r.sku}</td><td>${r.qty}件</td><td>฿${Math.round(r.sales).toLocaleString()}</td><td>¥${Math.round(r.profit).toLocaleString()}</td><td>${p.toFixed(1)}%</td><td><span class="${badgeClass(p)}">${badgeLabel(p)}</span></td></tr>`;}).join('');
+  document.getElementById('rt').innerHTML=`<thead><tr><th>#</th><th>商品名</th><th>SKU</th><th>数量</th><th>売上(THB)</th><th>利益(¥)</th><th>利益率</th><th>状態</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+// Order table
+function ordSearch(){ordST=document.getElementById('ord-search').value.toLowerCase();otbl();}
+
+function toggleCancel(i){
+  const newState=!ords[i].cancelled;
+  ords[i].cancelled=newState;
+  // 同一オーダーIDの子行も連動してキャンセル状態を同期
+  const oid=ords[i].orderId;
+  if(oid){
+    ords.forEach(o=>{if(o.orderId===oid)o.cancelled=newState;});
+  }
+  if(newState){
+    const cb=document.getElementById('show-cancelled');
+    if(cb)cb.checked=true;
+  }
+  ords.forEach(cp);saveLS();otbl();dash();
+}
+
+function getOrdFiltered(){
+  const m=document.getElementById('sm').value;
+  const c=document.getElementById('sc').value;
+  const showCancelled=document.getElementById('show-cancelled')?.checked;
+  return ords.map((o,i)=>({...o,_i:i})).filter(o=>
+    (showCancelled||!o.cancelled)&&
+    (m==='all'||o.date.startsWith(m))&&
+    (c==='all'||o.country===c)&&
+    (!ordST||(o.product||'').toLowerCase().includes(ordST)||(o.sku||'').toLowerCase().includes(ordST)||(o.variation||'').toLowerCase().includes(ordST)||(o.account||'').toLowerCase().includes(ordST))
+  );
+}
+
+// 展開状態を保持（グループキー=先頭行インデックス）
+const expandedGroups={};
+
+function toggleGroup(gid){
+  expandedGroups[gid]=!expandedGroups[gid];
+  const children=document.querySelectorAll(`.grp-child[data-gid="${gid}"]`);
+  children.forEach(tr=>{
+    if(expandedGroups[gid]){
+      tr.classList.remove('hidden');
+    } else {
+      tr.classList.add('hidden');
+    }
+  });
+  const arrow=document.getElementById('arr-'+gid);
+  if(arrow)arrow.textContent=expandedGroups[gid]?'▼':'▶';
+}
+
+function makeRow(o,sym,isHead,grpProfit,grpPr,childCount,gid){
+  const i=o._i;
+  const isCancelled=!!o.cancelled;
+  const cancelBtn=isCancelled
+    ?`<button onclick="event.stopPropagation();toggleCancel(${i})" style="font-size:11px;padding:2px 8px;border:1px solid #2e7d32;border-radius:4px;cursor:pointer;color:#2e7d32;background:#e8f5e9;">元に戻す</button>`
+    :`<button onclick="event.stopPropagation();toggleCancel(${i})" style="font-size:11px;padding:2px 8px;border:1px solid #c62828;border-radius:4px;cursor:pointer;color:#c62828;">ｷｬﾝｾﾙ</button>`;
+
+  // 利益・利益率セル：先頭行はグループ合計、子行は非表示
+  let profitCell,rateCell;
+  if(isHead && childCount>0){
+    const arrowIcon=`<span id="arr-${i}" style="font-size:10px;margin-right:4px;color:#888;">▶</span>`;
+    const orderIdCell=`<td style="font-size:11px;color:#999;cursor:pointer;" onclick="toggleGroup(${i})">${arrowIcon}${o.orderId||'-'} <span style="font-size:10px;color:#aaa;">(${childCount+1}品)</span></td>`;
+    profitCell=`<td id="pr${i}" style="font-weight:500;${isCancelled||grpProfit<0?'color:#c62828;':''}">${Math.round(grpProfit).toLocaleString()}</td>`;
+    rateCell=`<td><span id="rr${i}" class="${isCancelled?'badge bng':badgeClass(grpPr)}">${isCancelled?'ｷｬﾝｾﾙ':grpPr.toFixed(1)+'%'}</span></td>`;
+    return`<tr class="grp-head${isCancelled?' cancelled':''}">
+      ${orderIdCell}<td>${o.date}</td><td><input type="text" value="${(o.product||'').replace(/"/g,'&quot;')}" style="width:280px;font-size:11px;" oninput="updText(${i},'product',this.value)" onclick="event.stopPropagation()"></td><td style="font-size:11px;color:#999;">${o.parentSku||'-'}</td><td style="font-size:11px;color:#999;">${o.sku||'-'}</td><td>${o.variation||'-'}</td>
+      <td>${sym}${(o.price||0).toLocaleString()}</td><td>${o.qty||0}</td><td>${o.sf||0}%</td><td>${o.account}</td>
+      <td><input type="number" value="${o.rate||''}" placeholder="${getOrdRate(o).toFixed(2)}" step="0.01" min="0" oninput="upd(${i},'rate',this.value)" style="width:58px;" onclick="event.stopPropagation()"></td>
+      <td><input type="number" value="${o.receipt||''}" placeholder="0" oninput="upd(${i},'receipt',this.value)" onclick="event.stopPropagation()"></td>
+      <td><input type="number" value="${o.cost||''}" placeholder="0" oninput="upd(${i},'cost',this.value)" onclick="event.stopPropagation()"></td>
+      <td><input type="number" value="${o.af||''}" placeholder="0" oninput="upd(${i},'af',this.value)" onclick="event.stopPropagation()"></td>
+      <td><input type="number" value="${o.ds||''}" placeholder="0" oninput="upd(${i},'ds',this.value)" onclick="event.stopPropagation()"></td>
+      <td><input type="number" value="${o.pk||''}" placeholder="0" oninput="upd(${i},'pk',this.value)" onclick="event.stopPropagation()"></td>
+      ${profitCell}${rateCell}
+      <td onclick="event.stopPropagation()">${cancelBtn}</td>
+    </tr>`;
+  } else if(!isHead){
+    // 子行：利益・利益率は空（先頭行に集約）、キャンセルボタンなし
+    profitCell=`<td id="pr${i}" style="color:#bbb;font-size:11px;">-</td>`;
+    rateCell=`<td><span id="rr${i}"></span></td>`;
+    const isExpanded=expandedGroups[gid];
+    const childCls=['grp-child',isCancelled?'cancelled':'',isExpanded?'':'hidden'].filter(Boolean).join(' ');
+    return`<tr class="${childCls}" data-gid="${gid}">
+      <td style="font-size:11px;color:#ccc;padding-left:20px;">└</td><td>${o.date}</td><td><input type="text" value="${(o.product||'').replace(/"/g,'&quot;')}" style="width:280px;font-size:11px;" oninput="updText(${i},'product',this.value)"></td><td style="font-size:11px;color:#999;">${o.parentSku||'-'}</td><td style="font-size:11px;color:#999;">${o.sku||'-'}</td><td>${o.variation||'-'}</td>
+      <td>${sym}${(o.price||0).toLocaleString()}</td><td>${o.qty||0}</td><td>${o.sf||0}%</td><td>${o.account}</td>
+      <td><input type="number" value="${o.rate||''}" placeholder="${getOrdRate(o).toFixed(2)}" step="0.01" min="0" oninput="upd(${i},'rate',this.value)" style="width:58px;"></td>
+      <td><input type="number" value="${o.receipt||''}" placeholder="0" oninput="upd(${i},'receipt',this.value)"></td>
+      <td><input type="number" value="${o.cost||''}" placeholder="0" oninput="upd(${i},'cost',this.value)"></td>
+      <td><input type="number" value="${o.af||''}" placeholder="0" oninput="upd(${i},'af',this.value)"></td>
+      <td><input type="number" value="${o.ds||''}" placeholder="0" oninput="upd(${i},'ds',this.value)"></td>
+      <td><input type="number" value="${o.pk||''}" placeholder="0" oninput="upd(${i},'pk',this.value)"></td>
+      ${profitCell}${rateCell}
+      <td></td>
+    </tr>`;
+  } else {
+    // 単独行（グループなし）
+    profitCell=`<td id="pr${i}" style="font-weight:500;${isCancelled?'color:#c62828;':''}">${Math.round(o.profit||0).toLocaleString()}</td>`;
+    rateCell=`<td><span id="rr${i}" class="${isCancelled?'badge bng':badgeClass(o.pr||0)}">${isCancelled?'ｷｬﾝｾﾙ':(o.pr||0).toFixed(1)+'%'}</span></td>`;
+    return`<tr${isCancelled?' class="cancelled"':''}>
+      <td style="font-size:11px;color:#999;">${o.orderId||'-'}</td><td>${o.date}</td><td><input type="text" value="${(o.product||'').replace(/"/g,'&quot;')}" style="width:280px;font-size:11px;" oninput="updText(${i},'product',this.value)"></td><td style="font-size:11px;color:#999;">${o.parentSku||'-'}</td><td style="font-size:11px;color:#999;">${o.sku||'-'}</td><td>${o.variation||'-'}</td>
+      <td>${sym}${(o.price||0).toLocaleString()}</td><td>${o.qty||0}</td><td>${o.sf||0}%</td><td>${o.account}</td>
+      <td><input type="number" value="${o.rate||''}" placeholder="${getOrdRate(o).toFixed(2)}" step="0.01" min="0" oninput="upd(${i},'rate',this.value)" style="width:58px;"></td>
+      <td><input type="number" value="${o.receipt||''}" placeholder="0" oninput="upd(${i},'receipt',this.value)"></td>
+      <td><input type="number" value="${o.cost||''}" placeholder="0" oninput="upd(${i},'cost',this.value)"></td>
+      <td><input type="number" value="${o.af||''}" placeholder="0" oninput="upd(${i},'af',this.value)"></td>
+      <td><input type="number" value="${o.ds||''}" placeholder="0" oninput="upd(${i},'ds',this.value)"></td>
+      <td><input type="number" value="${o.pk||''}" placeholder="0" oninput="upd(${i},'pk',this.value)"></td>
+      ${profitCell}${rateCell}
+      <td>${cancelBtn}</td>
+    </tr>`;
+  }
+}
+
+function otbl(){
+  const filtered=getOrdFiltered();
+  const sym=getCurSym();
+  const cnt=document.getElementById('ord-count');
+  if(cnt)cnt.textContent=ordST?`${filtered.length}/${ords.length}件`:`${filtered.length}件`;
+  const h=`<thead><tr>
+    <th>オーダーID</th><th>注文日</th><th>商品名</th><th>親SKU</th><th>SKU</th><th>バリエーション</th><th>単価(${sym})</th><th>数量</th><th>販売手数料%</th><th>アカウント</th>
+    <th class="hm">レート(¥)</th><th class="hm">実入金額(${sym})</th><th class="hm">仕入原価(¥)</th><th class="hm">発送代行(¥)</th><th class="hm">国内送料(¥)</th><th class="hm">雑費(¥)</th>
+    <th>利益額(¥)</th><th>利益率</th><th></th>
+  </tr></thead>`;
+
+  // オーダーIDでグループ化（順序維持）
+  const groups=[];
+  const groupMap={};
+  filtered.forEach(o=>{
+    const key=o.orderId||('__solo_'+o._i);
+    if(!groupMap[key]){groupMap[key]=[];groups.push(key);}
+    groupMap[key].push(o);
+  });
+
+  const rows=groups.map(key=>{
+    const items=groupMap[key];
+    if(items.length===1){
+      return makeRow(items[0],sym,true,items[0].profit,items[0].pr||0,0,-1);
+    }
+    // グループ合計利益
+    // グループ合計：receipt・costは全行合算、af/ds/pkは先頭行のみ
+    const head=items[0];
+    const grpReceipt=items.reduce((s,o)=>s+(o.receipt||0),0);
+    const grpCost=items.reduce((s,o)=>s+(o.cost||0),0);
+    const grpReceiptJpy=grpReceipt*getOrdRate(head);
+    const grpProfit=grpReceiptJpy-grpCost-(head.af||0)-(head.ds||0)-(head.pk||0);
+    const grpPr=grpReceiptJpy>0?grpProfit/grpReceiptJpy*100:(grpProfit<0?-100:0);
+    const headIdx=head._i;
+    return makeRow(head,sym,true,grpProfit,grpPr,items.length-1,headIdx)
+      + items.slice(1).map(o=>makeRow(o,sym,false,0,0,0,headIdx)).join('');
+  }).join('');
+
+  document.getElementById('ot').innerHTML=h+`<tbody>${rows}</tbody>`;
+}
+
+// Customer table
+function custTbl(){
+  const st=(document.getElementById('cust-search')?.value||'').toLowerCase();
+  const sym=getCurSym();
+  const filtered=gf(); // 月・国フィルター適用
+  const map={};
+  filtered.forEach(o=>{
+    const k=o.account||'(不明)';
+    if(!map[k])map[k]={account:o.account,phone:o.phone||'-',address:o.address||'-',country:o.country,cnt:0,total:0,profit:0};
+    map[k].cnt++;map[k].total+=(o.receipt||0);map[k].profit+=o.profit;
+  });
+  let custs=Object.values(map).sort((a,b)=>b.cnt-a.cnt);
+  if(st)custs=custs.filter(c=>(c.account||'').toLowerCase().includes(st)||(c.address||'').toLowerCase().includes(st));
+  const cnt=document.getElementById('cust-count');
+  if(cnt)cnt.textContent=st?`${custs.length}/${Object.keys(map).length}件`:`${Object.keys(map).length}件`;
+  const rows=custs.map((c,i)=>{
+    const rep=c.cnt>=2?'<span class="badge bok" style="margin-left:4px;">リピーター</span>':'';
+    return`<tr>
+      <td style="color:#999">${i+1}</td>
+      <td>${c.account}</td>
+      <td>${c.country}</td>
+      <td style="font-weight:500;">${c.cnt}件${rep}</td>
+      <td>${sym}${Math.round(c.total).toLocaleString()}</td>
+      <td>¥${Math.round(c.profit).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('ctbl').innerHTML=`<thead><tr><th>#</th><th>アカウント名</th><th>国</th><th>注文回数</th><th>合計購入額(${sym})</th><th>利益合計(¥)</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+// Excel upload
+function uploadXlsx(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const data=XLSX.utils.sheet_to_json(ws,{raw:false});
+
+      // 既存オーダーIDのマップを作成
+      const existingMap={};
+      ords.forEach((o,i)=>{if(o.orderId)existingMap[o.orderId]=i;});
+
+      let added=0,updated=0;
+      data.forEach(row=>{
+        const id=row['หมายเลขคำสั่งซื้อ']||'';
+        const newReceipt=parseFloat(row['รายได้โดยประมาณ']||row['Estimated Order Income']||0)||0;
+        const baseRow={
+          orderId:id,
+          date:(row['วันที่ทำการสั่งซื้อ']||'').substring(0,10),
+          product:row['ชื่อสินค้า']||'',
+          parentSku:row['เลขอ้างอิง Parent SKU']||'',
+          sku:row['เลขอ้างอิง SKU (SKU Reference No.)']||'',
+          variation:row['ชื่อตัวเลือก']||'',
+          price:parseFloat(row['ราคาขาย'])||0,
+          qty:parseInt(row['จำนวน'])||0,
+          country:row['ประเทศ']||'TH',
+        };
+        if(id && id in existingMap){
+          // 既存データは手入力値を保持しつつ注文情報・実入金額を上書き
+          const idx=existingMap[id];
+          const existing=ords[idx];
+          ords[idx]={...existing,...baseRow,receipt:newReceipt||existing.receipt};
+          updated++;
+        } else {
+          // 新規追加
+          ords.push({...baseRow,receipt:newReceipt,cost:0,af:0,ds:0,pk:0,profit:0,pr:0});
+          added++;
+        }
+      });
+
+      ords.forEach(cp);applyMasterToOrds();saveLS();
+      const msg=`${added}件追加・${updated}件更新しました ✅`;
+      setStatus(msg);updateMonthSelect();otbl();dash();
+    }catch(err){setStatus('エラー: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);input.value='';
+}
+
+// 帳票用Excelエクスポート
+function exportExcel(){
+  const m=document.getElementById('sm').value,c=document.getElementById('sc').value;
+  const f=ords.filter(o=>(m==='all'||o.date.startsWith(m))&&(c==='all'||o.country===c));
+  const r=rate();
+  const header=[
+    '注文日','オーダーID','商品名','親SKU','SKU','バリエーション','アカウント','国',
+    '売上単価(THB)','数量','売上合計(THB)','売上合計(¥)',
+    '適用レート(¥/通貨)','入金額(THB)','入金額(¥)',
+    '仕入原価(¥)',
+    '販売手数料(%)','販売手数料額(¥)',
+    '決済手数料(%)','決済手数料額(¥)',
+    '発送代行費(¥)','国内送料(¥)','雑費(¥)',
+    '利益額(¥)','利益率(%)','キャンセル'
+  ];
+  const rows=f.map(o=>{
+    const rj=(o.receipt||0)*r;
+    const sfAmt=rj*(o.sf||0)/100;
+    const pfAmt=rj*(o.pf||0)/100;
+    return [
+      o.date,
+      o.orderId||'',
+      o.product||'',
+      o.parentSku||'',
+      o.sku||'',
+      o.variation||'',
+      o.account||'',
+      o.country||'',
+      o.price||0,
+      o.qty||0,
+      (o.price||0)*(o.qty||0),
+      Math.round((o.price||0)*(o.qty||0)*r),
+      getOrdRate(o),
+      o.receipt||0,
+      Math.round(rj),
+      o.cost||0,
+      o.sf||0,
+      Math.round(sfAmt),
+      o.pf||0,
+      Math.round(pfAmt),
+      o.af||0,
+      o.ds||0,
+      o.pk||0,
+      Math.round(o.profit||0),
+      Math.round((o.pr||0)*10)/10,
+      o.cancelled?'キャンセル':'',
+    ];
+  });
+
+  const ws=XLSX.utils.aoa_to_sheet([header,...rows]);
+
+  // 列幅設定
+  ws['!cols']=[
+    {wch:12},{wch:18},{wch:30},{wch:14},{wch:14},{wch:14},{wch:14},{wch:6},
+    {wch:12},{wch:6},{wch:12},{wch:12},
+    {wch:12},{wch:12},
+    {wch:12},{wch:12},{wch:12},
+    {wch:12},{wch:12},
+    {wch:12},{wch:12},
+    {wch:12},{wch:10},{wch:10},
+    {wch:12},{wch:10},
+  ];
+
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,'売上明細',ws);
+
+  // サマリーシートを追加
+  const sumHeader=['商品名','SKU','数量','売上合計(THB)','入金額合計(THB)','入金額合計(¥)','利益合計(¥)','平均利益率(%)'];
+  const sumMap={};
+  f.forEach(o=>{
+    const k=o.sku||o.product;
+    if(!sumMap[k])sumMap[k]={product:o.product,sku:o.sku,qty:0,sales:0,receipt:0,profit:0};
+    sumMap[k].qty+=(o.qty||0);sumMap[k].sales+=(o.price||0)*(o.qty||0);
+    sumMap[k].receipt+=(o.receipt||0);sumMap[k].profit+=o.profit;
+  });
+  const sumRows=Object.values(sumMap).sort((a,b)=>b.receipt-a.receipt).map(s=>[
+    s.product,s.sku,s.qty,
+    Math.round(s.sales),Math.round(s.receipt),Math.round(s.receipt*r),
+    Math.round(s.profit),
+    s.receipt>0?Math.round(s.profit/(s.receipt*r)*1000)/10:0,
+  ]);
+  const ws2=XLSX.utils.aoa_to_sheet([sumHeader,...sumRows]);
+  ws2['!cols']=[{wch:30},{wch:14},{wch:6},{wch:14},{wch:16},{wch:14},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,'商品別サマリー',ws2);
+
+  const fname='shopee_sales_'+new Date().toISOString().substring(0,10)+'.xlsx';
+  XLSX.writeFile(wb,fname);
+}
+function updateMonthSelect(){
+  const sel=document.getElementById('sm');
+  const current=sel.value;
+  const months=[...new Set(ords.map(o=>o.date.substring(0,7)).filter(Boolean))].sort().reverse();
+  sel.innerHTML='<option value="all">全期間</option>'+months.map(m=>{
+    const [y,mo]=m.split('-');
+    const label=y+'年'+parseInt(mo)+'月';
+    return`<option value="${m}">${label}</option>`;
+  }).join('');
+  // 以前の選択値を維持、なければ全期間
+  if([...sel.options].some(o=>o.value===current))sel.value=current;
+  else sel.value='all';
+}
+
+// Init
+loadMaster();
+loadMkt();
+// 初期表示：タイ設定を反映
+document.getElementById('ri').value=mktCfg['TH'].rate;
+document.getElementById('rate-label').textContent='1฿ =';
+if(loadLS()){
+  setStatus(ords.length+'件（保存済みデータ）');
+}else{
+  ords=SD.map(o=>({...o,profit:0,pr:0}));
+  setStatus('サンプルデータ表示中');
+}
+ords.forEach(cp);
+updateMonthSelect();
+dash();
+</script>
+</body>
+</html>
